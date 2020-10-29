@@ -3,7 +3,9 @@ import random
 from loguru import logger
 from random import randrange
 import argparse
+import pandas as pd
 
+import matplotlib.pyplot as plt
 
 '''
 This is an implementation of the Susceptible, Infected, Recovered model for 02-718.
@@ -13,14 +15,38 @@ Simon Levine-Gottreich, 2020
 Ex: SRI_discrete.py --m 100 --n 1000 --k 10 --lambdas 1,1,0
 '''
 
-def main(args):
-    args = parser.parse_args()
-    world = World(args.m,args.N,args.k,args.l1_0,args.l2,args.l3)
+def main():
+    trial_params = {}
+    trial_params['1'] = (100,1000,10,2,1,0) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0)
+    trial_params['2'] = (100,1000,10,2,1,0.001) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0.001)
+    trial_params['3'] = (100,1000,10,2,1,0.01) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0.01)
+    trial_params['4'] = (100,1000,10,2,1,0.1) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0.1)
+
+    for trial, params in trial_params.items():
+        run_and_write_outputs(trial,params,show_plot=False)
+
+    # args = parser.parse_args()
+    # world = World(args.m,args.N,args.k,args.l1_0,args.l2,args.l3)
+
+
+
+def run_and_write_outputs(trial,params,show_plot=False):
+
+    world = World(*params)
     world_after_covid = CTMM(world)
 
-    for i in range(world_after_covid.m):
-        logger.info(f'Final results are {get_resultant_values(world_after_covid.countries[i])}')
+    results = [get_resultant_values(world_after_covid.countries[i]) for i in range(world_after_covid.m)]
+    logger.info('Final results are:')
+    results_df = pd.DataFrame.from_records(results).rename(columns={0:'lambda_i,1',1:'Ri/(Ri+Si)'})
+    logger.info(results_df)
+    logger.info('saved results to csv, saved plot')
 
+    results_df.plot(title='λi1 vs. final Ri/(Ri + Si) over all populations (Trial #'+trial+')')
+    if show_plot == True:
+        plt.show()
+    #returning file
+    plt.savefig('output_'+trial+'.png')
+    results_df.to_csv('results'+trial+'.csv')
 
 class Country:
     # make one country i, for 1...i...m
@@ -185,7 +211,6 @@ def CTMM(world:World):
                     # country j, chosen at random (uniform)
                 t+=world.countries[i].t_m
 
-        logger.critical(world.sum_of_infected)
         world.update_sum_of_infected()
         if world.sum_of_infected <0:
             break #just in case
@@ -193,49 +218,50 @@ def CTMM(world:World):
     return world
 
 
-parser = argparse.ArgumentParser(
-    description='Process (m, N, k, l1, l2, l3) args for CTMM (discrete SRI).'
-    )
+# parser = argparse.ArgumentParser(
+#     description='Process (m, N, k, l1, l2, l3) args for CTMM (discrete SRI).'
+#     )
 
-parser.add_argument(
-        "--m",
-        default=100,
-        type=int,
-        )
+# parser.add_argument(
+#         "--m",
+#         default=100,
+#         type=int,
+#         )
 
-parser.add_argument(
-        "--N",
-        default=1000,
-        type=float,
-        )
+# parser.add_argument(
+#         "--N",
+#         default=1000,
+#         type=float,
+#         )
 
-parser.add_argument(
-        "--k",
-        default=10,
-        type=int,
-        )
+# parser.add_argument(
+#         "--k",
+#         default=10,
+#         type=int,
+#         )
 
-parser.add_argument(
-        "--l1_0",
-        default=2.,
-        type=float,
-        )
+# parser.add_argument(
+#         "--l1_0",
+#         default=2.,
+#         type=float,
+#         )
 
-parser.add_argument(
-        "--l2",
-        default=1.,
-        type=float,
-        )
+# parser.add_argument(
+#         "--l2",
+#         default=1.,
+#         type=float,
+#         )
 
-parser.add_argument(
-        "--l3",
-        default=0.0,
-        type=float,
-        )
+# parser.add_argument(
+#         "--l3",
+#         default=0.001,
+#         type=float,
+#         )
         
         
-args = parser.parse_args()
+# args = parser.parse_args()
 
 if __name__=="__main__":
-    main(args)
+    # main(args)
+    main()
 
