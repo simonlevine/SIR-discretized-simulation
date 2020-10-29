@@ -16,6 +16,7 @@ Ex: SRI_discrete.py --m 100 --n 1000 --k 10 --lambdas 1,1,0
 '''
 
 def main():
+
     trial_params = {}
     trial_params['1'] = (100,1000,10,2,1,0) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0)
     trial_params['2'] = (100,1000,10,2,1,0.001) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0.001)
@@ -175,17 +176,11 @@ def CTMM(world:World):
             world.countries[i].update_rate_of_recovery()
             world.countries[i].update_rate_of_migration_out()
 
-            # logger.warning(world.countries[i].rate_of_migration_out)
-            # logger.warning(world.countries[i].rate_of_recovery)
-            # logger.warning(world.countries[i].rate_of_infection)
 
             world.countries[i].sample_t_infection() #get t_i,t_r,t_m = Exp(rate_i), ...
             world.countries[i].sample_t_recovery()  
             world.countries[i].sample_t_migration_out()
 
-            # logger.warning(world.countries[i].t_i)
-            # logger.warning(world.countries[i].t_r)
-            # logger.warning(world.countries[i].t_m)
 
             t_min = np.min(
                 [world.countries[i].t_i,
