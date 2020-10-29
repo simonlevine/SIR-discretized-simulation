@@ -18,7 +18,7 @@ Our, More General Case:
 
 - People are from different countries affecting $\lambda_1$ differently, with different ways of controlling immigration.
 - Assume $m$ countries each with population $N_i = |S_i| + |I_i| + |R_i|$, with
-  - infections at rate $\lambda_{i1}Ii\frac{S_i}{R_i}$
+  - infections at rate $\lambda_{i1}Ii\frac{S_i}{N_i}$
   - recovery at rate $\lambda_{i2}I_i$
   - Also, assume inter-country migration at $\lambda_{i3}$, for a rate of movement fooor countries $i \to j$ at $\lambda_{i3}N_i$
 
