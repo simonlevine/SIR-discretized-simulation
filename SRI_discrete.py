@@ -90,6 +90,10 @@ class Country:
     def update_rate_of_migration_out(self):
         self.rate_of_migration_out = self.l3*self.N 
 
+    def update_population_count(self):
+        #needed in case of migration
+        self.N = self.S + self.I + self.R
+
     def sample_t_infection(self):
         if self.rate_of_infection <= 0:
             self.t_i = float('inf')
@@ -171,7 +175,8 @@ def CTMM(world:World):
     # for _ in range(100):
     while world.sum_of_infected != 0:
         for i in range(world.m):
-
+            
+            world.countries[i].update_population_count() #update in case of migration in/out
             world.countries[i].update_rate_of_infection() #get rates infection, recov, and (e)migration
             world.countries[i].update_rate_of_recovery()
             world.countries[i].update_rate_of_migration_out()
