@@ -176,7 +176,6 @@ def CTMM(world:World):
     while world.sum_of_infected != 0:
         for i in range(world.m):
             
-            world.countries[i].update_population_count() #update in case of migration in/out
             world.countries[i].update_rate_of_infection() #get rates infection, recov, and (e)migration
             world.countries[i].update_rate_of_recovery()
             world.countries[i].update_rate_of_migration_out()
@@ -210,6 +209,9 @@ def CTMM(world:World):
                     # country i has uniform probability of migration from S,I, or R.
                     # country j, chosen at random (uniform)
                 t+=world.countries[i].t_m
+                world.countries[i].update_population_count() #update in case of migration in/out
+                world.countries[j].update_population_count() #update in case of migration in/out
+
 
         world.update_sum_of_infected()
         if world.sum_of_infected <0:
