@@ -68,9 +68,9 @@ class Country:
         # I will compute rates of infection first during an the initial CTMM iteration
         # since a country may have migrants on its first round, changing these values.
 
-        self.rate_of_infection = None #self.l1*self.I*(self.S/self.N)
-        self.rate_of_recovery =  None #self.l2*self.I
-        self.rate_of_migration_out = None #self.l3*self.N
+        self.rate_of_infection = self.l1*self.I*(self.S/self.N)
+        self.rate_of_recovery =  self.l2*self.I
+        self.rate_of_migration_out = self.l3*self.N
 
         self.t_i = None
         self.t_r = None
@@ -176,12 +176,7 @@ def CTMM(world:World):
     # for _ in range(100):
     while world.sum_of_infected != 0:
         for i in range(world.m):
-            
-            world.countries[i].update_rate_of_infection() #get rates infection, recov, and (e)migration
-            world.countries[i].update_rate_of_recovery()
-            world.countries[i].update_rate_of_migration_out()
-
-
+        
             world.countries[i].sample_t_infection() #get t_i,t_r,t_m = Exp(rate_i), ...
             world.countries[i].sample_t_recovery()  
             world.countries[i].sample_t_migration_out()
@@ -194,13 +189,18 @@ def CTMM(world:World):
             )
 
             if world.countries[i].t_i == t_min:
-                world.new_infection(world.countries[i])
+                # world.new_infection(world.countries[i])
                 t+=world.countries[i].t_i
+                world.countries[i].I += 1
+                world.countries[i].S -= 1
                 #including these staments in all conditionals in case there's a tie in the min (?)
 
             elif world.countries[i].t_r == t_min:
-                world.new_recovery(world.countries[i])
+                # world.new_recovery(world.countries[i])
                 t+=world.countries[i].t_r
+                world.countries[i].I -= 1
+                world.countries[i].R += 1
+ 
 
             elif world.countries[i].t_m == t_min:
                 #randomly select a destination country for migration...
@@ -213,8 +213,12 @@ def CTMM(world:World):
                 world.countries[i].update_population_count() #update in case of migration in/out
                 world.countries[j].update_population_count() #update in case of migration in/out
 
+            world.countries[i].update_rate_of_infection() #get rates infection, recov, and (e)migration
+            world.countries[i].update_rate_of_recovery()
+            world.countries[i].update_rate_of_migration_out()
 
         world.update_sum_of_infected()
+        
         if world.sum_of_infected <0:
             break #just in case
 
