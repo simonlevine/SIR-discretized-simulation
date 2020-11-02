@@ -42,7 +42,8 @@ def run_and_write_outputs(trial,params,show_plot=False):
     logger.info(results_df)
     logger.info('saved results to csv, saved plot')
 
-    results_df.plot(title='λi1 vs. final Ri/(Ri + Si) over all populations (Trial #'+trial+')')
+    results_df.plot(title='λi1 (X) vs. final Ri/(Ri + Si) (Y) over all populations (Trial #'+trial+')',
+                    kind='scatter', x='lambda_i,1',y = 'Ri/(Ri+Si)')
     if show_plot == True:
         plt.show()
     #returning file
