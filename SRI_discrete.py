@@ -34,9 +34,16 @@ def main():
 def run_and_write_outputs(trial,params,show_plot=False):
 
     world = World(*params)
-    world_after_covid = CTMM(world)
 
-    results = [get_resultant_values(world_after_covid.countries[i]) for i in range(world_after_covid.m)]
+    results = CTMM(world)
+
+    for i in results:
+        print(i)
+
+    # results = [get_resultant_values(world_after_covid.countries[i]) for i in range(world_after_covid.m)]
+
+    # r
+
     logger.info('Final results are:')
     results_df = pd.DataFrame.from_records(results).rename(columns={0:'lambda_i,1',1:'Ri/(Ri+Si)'})
     logger.info(results_df)
@@ -54,66 +61,23 @@ class Country:
     # make one country i, for 1...i...m
     def __init__(self, N,k,l1_0,l2,l3):
 
-        self.N = N
+        # self.N = N
 
         #initialize parameters
         self.S = N-k
         self.I = k
-        self.R = 0
+        self.R = 0        
 
         self.l1 = np.random.uniform(low=0.0,high=l1_0)
         self.l2 = l2
         self.l3 = l3
-        
-        # I will compute rates of infection first during an the initial CTMM iteration
-        # since a country may have migrants on its first round, changing these values.
 
-        self.rate_of_infection = self.l1*self.I*(self.S/self.N)
-        self.rate_of_recovery =  self.l2*self.I
-        self.rate_of_migration_out = self.l3*self.N
+    @property
+    def N(self):
+        return self.S + self.I + self.R
 
-        self.t_i = None
-        self.t_r = None
-        self.t_m = None
-
-    def new_infection(self):
-        self.S -= 1
-        self.I += 1
-
-    def new_recovery(self):
-        self.I -= 1
-        self.R += 1
-
-    def update_rate_of_infection(self):
-        self.rate_of_infection = self.l1*self.I*(self.S/self.N) #None
-    def update_rate_of_recovery(self):
-        self.rate_of_recovery = self.l2*self.I
-    def update_rate_of_migration_out(self):
-        self.rate_of_migration_out = self.l3*self.N 
-
-    def update_population_count(self):
-        #needed in case of migration
-        self.N = self.S + self.I + self.R
-
-    def sample_t_infection(self):
-        if self.rate_of_infection <= 0:
-            self.t_i = float('inf')
-        else:
-            self.t_i=np.random.exponential((1/self.rate_of_infection)) #numpy uses scaling param 1/beta
-
-    def sample_t_recovery(self):
-        if self.rate_of_recovery <= 0:
-            self.t_r = float('inf')
-        else:
-            self.t_r = np.random.exponential((1/self.rate_of_recovery))
-
-    def sample_t_migration_out(self):
-        if self.rate_of_migration_out <= 0:
-            self.t_m = float('inf')
-        else:
-            self.t_m = np.random.exponential((1/self.rate_of_migration_out))
-
-
+def sample_from_exp(rate_param):
+    return np.random.exponential((1/rate_param)) if rate_param > 0 else float('inf')
 
 class World:
     def __init__(self, m, N, k, l1_0, l2, l3):
@@ -121,12 +85,10 @@ class World:
         self.m = m
         # initialize countries
         self.countries = [Country(N,k,l1_0,l2,l3) for _ in range(self.m)]
-        self.sum_of_infected = np.sum([c.I for c in self.countries])
-    
-    def new_infection(self, country_i:Country):
-        country_i.new_infection()
-    def new_recovery(self, country_i: Country):
-        country_i.new_recovery()
+
+    @property
+    def I(self):
+        return np.sum([c.I for c in self.countries])
 
     def new_migration(self, country_i:Country, country_j:Country):
         #migrate, and assume a uniform distribution across
@@ -165,106 +127,62 @@ def get_resultant_values(country_i:Country) -> float:
     Returns:
     - tuple, (population l1 parameter, final fraction of infected)
     '''
-    return (country_i.l1, (country_i.R/(country_i.R + country_i.S)) )
+    return (country_i.l1, (country_i.R/(country_i.N)) )
+
+
+def get_rate_of_infection(country):
+    return country.l1*country.I*(country.S/country.N)
+
+def get_rate_of_recovery(country):
+    return country.l2*country.I
+
+def get_rate_of_migration_out(country):
+    return country.l3*country.N 
 
 def CTMM(world:World):
 
     '''Run a continuous time markov model based on
     an initialized World object'''
 
+    results = []
+
     t=0
     # for _ in range(100):
-    while world.sum_of_infected != 0:
-        for i in range(world.m):
+    while world.I > 0:
+        for i, country in enumerate(world.countries):
+
+            t_i = sample_from_exp(country.l1*country.I*(country.S/country.N))
+            t_r = sample_from_exp(country.l2*country.I)
+            t_m = sample_from_exp(country.l3*country.N )
+
+            # logger.info((t_i, t_r, t_m))
+
+            if not (t_i == float('inf') and t_r == float('inf') and t_m == float('inf')):
+
+                t_min = min(t_i,t_r,t_m)
+                
+                if t_i == t_min:
+                    t+=t_i
+                    country.I += 1
+                    country.S -= 1
+                    #including these staments in all conditionals in case there's a tie in the min (?)
+                elif t_r == t_min:
+                    # world.new_recovery(country)
+                    t+=t_r
+                    country.I -= 1
+                    country.R += 1
+                elif t_m == t_min:
+                    #randomly select a destination country for migration...
+                    t+=t_m
+                    j = np.random.choice(np.setdiff1d(range(world.m), i))
+                    world.new_migration(country,world.countries[j])
+
+    for country in world.countries:
+        results.append((country.l1, country.R/country.N))
         
-            world.countries[i].sample_t_infection() #get t_i,t_r,t_m = Exp(rate_i), ...
-            world.countries[i].sample_t_recovery()  
-            world.countries[i].sample_t_migration_out()
+    return results
 
 
-            t_min = np.min(
-                [world.countries[i].t_i,
-                world.countries[i].t_r,
-                world.countries[i].t_m]
-            )
-
-            if world.countries[i].t_i == t_min:
-                # world.new_infection(world.countries[i])
-                t+=world.countries[i].t_i
-                world.countries[i].I += 1
-                world.countries[i].S -= 1
-                #including these staments in all conditionals in case there's a tie in the min (?)
-
-            elif world.countries[i].t_r == t_min:
-                # world.new_recovery(world.countries[i])
-                t+=world.countries[i].t_r
-                world.countries[i].I -= 1
-                world.countries[i].R += 1
- 
-
-            elif world.countries[i].t_m == t_min:
-                #randomly select a destination country for migration...
-                j = np.random.choice(np.setdiff1d(range(world.m), i))
-                world.new_migration(world.countries[i],world.countries[j])
-                    #will push numbers to/from respective countries, s.t.
-                    # country i has uniform probability of migration from S,I, or R.
-                    # country j, chosen at random (uniform)
-                t+=world.countries[i].t_m
-                world.countries[i].update_population_count() #update in case of migration in/out
-                world.countries[j].update_population_count() #update in case of migration in/out
-
-            world.countries[i].update_rate_of_infection() #get rates infection, recov, and (e)migration
-            world.countries[i].update_rate_of_recovery()
-            world.countries[i].update_rate_of_migration_out()
-
-        world.update_sum_of_infected()
-        
-        if world.sum_of_infected <0:
-            break #just in case
-
-    return world
-
-
-# parser = argparse.ArgumentParser(
-#     description='Process (m, N, k, l1, l2, l3) args for CTMM (discrete SRI).'
-#     )
-
-# parser.add_argument(
-#         "--m",
-#         default=100,
-#         type=int,
-#         )
-
-# parser.add_argument(
-#         "--N",
-#         default=1000,
-#         type=float,
-#         )
-
-# parser.add_argument(
-#         "--k",
-#         default=10,
-#         type=int,
-#         )
-
-# parser.add_argument(
-#         "--l1_0",
-#         default=2.,
-#         type=float,
-#         )
-
-# parser.add_argument(
-#         "--l2",
-#         default=1.,
-#         type=float,
-#         )
-
-# parser.add_argument(
-#         "--l3",
-#         default=0.001,
-#         type=float,
-#         )
-        
         
 # args = parser.parse_args()
 
