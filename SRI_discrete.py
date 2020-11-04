@@ -16,7 +16,7 @@ Ex: SRI_discrete.py --m 100 --n 1000 --k 10 --lambdas 1,1,0
 '''
 
 def main():
-
+    np.random.seed
     trial_params = {}
     trial_params['1'] = (100,1000,10,2,1,0) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0)
     trial_params['2'] = (100,1000,10,2,1,0.001) #(m=100,N=1000,k=10,l1_0=2,l2=1,l3=0.001)
@@ -90,34 +90,6 @@ class World:
     def I(self):
         return np.sum([c.I for c in self.countries])
 
-    def new_migration(self, country_i:Country, country_j:Country):
-        #migrate, and assume a uniform distribution across
-        # S,I,and R groups for who will migrate...
-
-        #not the cleanest but whatever...
-        subpopulations_i = [country_i.S,country_i.I,country_i.R]
-        able_to_migrate_i = [p!=0 for p in subpopulations_i] #1,0,1 , for ex.
-
-        choice_i_idx = randrange(len(able_to_migrate_i))
-        choice_i = able_to_migrate_i[choice_i_idx]
-
-        while choice_i == 0:
-            # take a random person from a group that actually
-            # still has people!
-            del able_to_migrate_i[choice_i_idx] #remove from consideration
-            choice_i_idx = randrange(len(able_to_migrate_i)) #resample
-            choice_i = able_to_migrate_i[choice_i_idx] #choose new subpopulation from N = S,I, or R.
-
-        if choice_i_idx == 0:
-            country_i.S -= 1
-            country_j.S += 1
-        elif choice_i_idx == 1:
-            country_i.I -= 1
-            country_j.I += 1
-        elif choice_i_idx == 2:
-            country_i.R -= 1
-            country_j.R += 1
-
     def update_sum_of_infected(self):
         self.sum_of_infected = np.sum([c.I for c in self.countries])
     
@@ -130,15 +102,6 @@ def get_resultant_values(country_i:Country) -> float:
     return (country_i.l1, (country_i.R/(country_i.N)) )
 
 
-def get_rate_of_infection(country):
-    return country.l1*country.I*(country.S/country.N)
-
-def get_rate_of_recovery(country):
-    return country.l2*country.I
-
-def get_rate_of_migration_out(country):
-    return country.l3*country.N 
-
 def CTMM(world:World):
 
     '''Run a continuous time markov model based on
@@ -149,33 +112,64 @@ def CTMM(world:World):
     t=0
     # for _ in range(100):
     while world.I > 0:
-        for i, country in enumerate(world.countries):
 
-            t_i = sample_from_exp(country.l1*country.I*(country.S/country.N))
-            t_r = sample_from_exp(country.l2*country.I)
-            t_m = sample_from_exp(country.l3*country.N )
+        infect_vec = [sample_from_exp(country.l1*country.I*(country.S/country.N)) for country in world.countries]
+        t_i, i = min(infect_vec), np.argmin(infect_vec)
+
+        recover_vec = [sample_from_exp(country.l2*country.I) for country in world.countries]
+        t_r, r = min(recover_vec), np.argmin(recover_vec)
+
+        migrateS_vec = [sample_from_exp(country.l3*country.S) for country in world.countries]
+        t_m1, m1 = min(migrateS_vec), np.argmin(migrateS_vec)
+
+        migrateI_vec = [sample_from_exp(country.l3*country.I) for country in world.countries]
+        t_m2, m2 = min(migrateI_vec), np.argmin(migrateI_vec)
+
+        migrateR_vec = [sample_from_exp(country.l3*country.R) for country in world.countries]
+        t_m3, m3 = min(migrateR_vec), np.argmin(migrateR_vec)
+
+        t_min_global = min(t_i,t_r,t_m1,t_m2,t_m3)
 
             # logger.info((t_i, t_r, t_m))
 
-            if not (t_i == float('inf') and t_r == float('inf') and t_m == float('inf')):
+        if not (
+            t_i == float('inf') and
+            t_r == float('inf') and
+            t_m1 == float('inf') and 
+            t_m2 == float('inf') and
+            t_m3 == float('inf')
+            ):
+            
+            if t_i == t_min_global:
+                t+=t_i
+                world.countries[i].I += 1
+                world.countries[i].S -= 1
+                #including these staments in all conditionals in case there's a tie in the min (?)
+            elif t_r == t_min_global:
+                # world.new_recovery(country)
+                t+=t_r
+                world.countries[r].I -= 1
+                world.countries[r].R += 1
 
-                t_min = min(t_i,t_r,t_m)
-                
-                if t_i == t_min:
-                    t+=t_i
-                    country.I += 1
-                    country.S -= 1
-                    #including these staments in all conditionals in case there's a tie in the min (?)
-                elif t_r == t_min:
-                    # world.new_recovery(country)
-                    t+=t_r
-                    country.I -= 1
-                    country.R += 1
-                elif t_m == t_min:
-                    #randomly select a destination country for migration...
-                    t+=t_m
-                    j = np.random.choice(np.setdiff1d(range(world.m), i))
-                    world.new_migration(country,world.countries[j])
+            elif t_m1 == t_min_global:
+                #randomly select a destination country for migration...
+                t+=t_m1
+                j = np.random.choice(np.setdiff1d(range(world.m), i))
+                world.countries[m1].S-=1
+                world.countries[j].S +=1
+
+            elif t_m2 == t_min_global:
+                #randomly select a destination country for migration...
+                t+=t_m2
+                j = np.random.choice(np.setdiff1d(range(world.m), i))
+                world.countries[m2].I-=1
+                world.countries[j].I +=1
+
+            elif t_m3 == t_min_global:
+                t+=t_m3
+                j = np.random.choice(np.setdiff1d(range(world.m), i))
+                world.countries[m3].R -=1
+                world.countries[j].R +=1
 
     for country in world.countries:
         results.append((country.l1, country.R/country.N))
