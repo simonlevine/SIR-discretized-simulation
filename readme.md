@@ -1,3 +1,11 @@
+### Results
+
+![run1](output_1.png)
+![run2](output_2.png)
+![run3](output_3.png)
+![run4](output_4.png)
+
+
 This is an implementation of the Susceptible, Infected, Recovered model for infectious disease.
 
 We will use a simple SIR model here to examine issues of how one might slow COVID-19 infections.
